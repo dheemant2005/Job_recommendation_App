@@ -1,266 +1,200 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
-import { getCompanies } from '../Services/CompanyService';
-import { getJobs } from '../Services/JobService';
-import type { Company } from '../types/company';
-import type { Job } from '../types/job';
+import { useEffect, useState } from "react";
+import api from "../Services/api";
+import { getCompanies } from "../Services/CompanyService";
+import { getJobs } from "../Services/JobService";
+import type { Company } from "../types/company";
+import type { Job } from "../types/job";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+interface Application { id: number; job_id: number; user_id: number; resume_url: string; status: string; applied_at: string; }
+
+function statusClass(s: string) {
+  if (s === "pending")  return "badge badge-pending";
+  if (s === "reviewed") return "badge badge-reviewed";
+  if (s === "accepted") return "badge badge-accepted";
+  return "badge badge-rejected";
+}
 
 export default function AdminDashboard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [applications, setApplications] = useState<any[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'companies' | 'jobs' | 'applications'>('overview');
+  const [activeTab, setActiveTab] = useState<"overview" | "companies" | "jobs" | "applications">("overview");
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('user_role');
-    
-    if (!token || role !== 'Admin') {
-      window.location.href = '/login';
-      return;
-    }
-
-    fetchData();
+    Promise.all([
+      getCompanies(),
+      getJobs(),
+      api.get("/applications/all").catch(() => ({ data: [] })),
+    ]).then(([c, j, a]) => {
+      setCompanies(c); setJobs(j); setApplications(a.data);
+    }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
-  const fetchData = async () => {
+  const handleStatusChange = async (id: number, status: string) => {
     try {
-      const [companiesData, jobsData, applicationsData] = await Promise.all([
-        getCompanies(),
-        getJobs(),
-        fetchApplications()
-      ]);
-      setCompanies(companiesData);
-      setJobs(jobsData);
-      setApplications(applicationsData);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
-    } finally {
-      setLoading(false);
-    }
+      await api.patch(`/applications/${id}`, { status });
+      const updated = await api.get("/applications/all").catch(() => ({ data: [] }));
+      setApplications(updated.data);
+    } catch { alert("Failed to update status"); }
   };
 
-  const fetchApplications = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/applications/all`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Failed to fetch applications:', error);
-      return [];
-    }
-  };
+  if (loading) return (
+    <div style={{ display: "flex", justifyContent: "center", padding: "4rem" }}>
+      <span className="animate-spin" style={{ width: 32, height: 32, border: "3px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", display: "inline-block" }} />
+    </div>
+  );
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_role');
-    window.location.href = '/login';
-  };
-
-  const handleStatusChange = async (applicationId: number, newStatus: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.patch(
-        `${API_URL}/applications/${applicationId}`,
-        { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      // Refresh applications
-      const updatedApplications = await fetchApplications();
-      setApplications(updatedApplications);
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      alert('Failed to update application status');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
-      </div>
-    );
-  }
+  const tabs: Array<{ id: typeof activeTab; label: string; count: number }> = [
+    { id: "overview",     label: "Overview",     count: 0 },
+    { id: "companies",    label: "Companies",    count: companies.length },
+    { id: "jobs",         label: "Jobs",         count: jobs.length },
+    { id: "applications", label: "Applications", count: applications.length },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-sm text-gray-600">TalentSpark Management Portal</p>
-          </div>
+    <div className="page-container" style={{ maxWidth: 1000 }}>
+      <div className="page-header">
+        <h2 className="gradient-text">Admin Dashboard</h2>
+        <p>TalentSpark Management Portal</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="tabs">
+        {tabs.map(t => (
           <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+            key={t.id}
+            className={`tab-btn ${activeTab === t.id ? "active" : ""}`}
+            onClick={() => setActiveTab(t.id)}
           >
-            Logout
-          </button>
-        </div>
-      </header>
-
-      {/* Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="bg-white rounded-lg shadow-sm p-2 flex space-x-2">
-          {['overview', 'companies', 'jobs', 'applications'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={`px-6 py-3 rounded-lg font-medium transition capitalize ${
-                activeTab === tab
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Companies</p>
-                  <p className="text-3xl font-bold text-gray-900">{companies.length}</p>
-                </div>
-                <div className="bg-blue-100 p-3 rounded-full">
-                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Jobs</p>
-                  <p className="text-3xl font-bold text-gray-900">{jobs.length}</p>
-                </div>
-                <div className="bg-green-100 p-3 rounded-full">
-                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Applications</p>
-                  <p className="text-3xl font-bold text-gray-900">{applications.length}</p>
-                </div>
-                <div className="bg-purple-100 p-3 rounded-full">
-                  <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'companies' && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Companies Management</h2>
-            <div className="space-y-4">
-              {companies.map((company) => (
-                <div key={company.id} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{company.name}</h3>
-                    <p className="text-sm text-gray-600">{company.description}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm">Edit</button>
-                    <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm">Delete</button>
-                  </div>
-                </div>
-              ))}
-              {companies.length === 0 && (
-                <p className="text-gray-500 text-center py-8">No companies found</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'jobs' && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Jobs Management</h2>
-            <div className="space-y-4">
-              {jobs.map((job) => (
-                <div key={job.id} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{job.title}</h3>
-                    <p className="text-sm text-gray-600">{job.description}</p>
-                    <p className="text-xs text-gray-500 mt-1">Company ID: {job.company_id}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm">Edit</button>
-                    <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm">Delete</button>
-                  </div>
-                </div>
-              ))}
-              {jobs.length === 0 && (
-                <p className="text-gray-500 text-center py-8">No jobs found</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'applications' && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Applications Management</h2>
-            {applications.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No applications yet</p>
-            ) : (
-              <div className="space-y-4">
-                {applications.map((app) => {
-                  const job = jobs.find(j => j.id === app.job_id);
-                  return (
-                    <div key={app.id} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{job?.title || 'Unknown Job'}</h3>
-                        <p className="text-sm text-gray-600">User ID: {app.user_id}</p>
-                        <p className="text-xs text-gray-500 mt-1">Applied: {new Date(app.applied_at).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          app.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          app.status === 'reviewed' ? 'bg-blue-100 text-blue-800' :
-                          app.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {app.status}
-                        </span>
-                        <select
-                          value={app.status}
-                          onChange={(e) => handleStatusChange(app.id, e.target.value)}
-                          className="text-sm border border-gray-300 rounded px-2 py-1"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="reviewed">Reviewed</option>
-                          <option value="accepted">Accepted</option>
-                          <option value="rejected">Rejected</option>
-                        </select>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {t.label}
+            {t.count > 0 && (
+              <span style={{
+                background: activeTab === t.id ? "rgba(255,255,255,0.25)" : "var(--card-bg)",
+                border: "1px solid var(--border)",
+                padding: "0.1rem 0.45rem",
+                borderRadius: "100px",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                marginLeft: "0.25rem",
+              }}>{t.count}</span>
             )}
-          </div>
-        )}
+          </button>
+        ))}
       </div>
+
+      {/* Overview */}
+      {activeTab === "overview" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }} className="stagger">
+          <div className="stat-card"><div className="stat-value">{companies.length}</div><div className="stat-label">Companies</div></div>
+          <div className="stat-card"><div className="stat-value">{jobs.length}</div><div className="stat-label">Active Jobs</div></div>
+          <div className="stat-card">
+            <div className="stat-value" style={{ background: "none", WebkitTextFillColor: "#a855f7" }}>{applications.length}</div>
+            <div className="stat-label">Applications</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value" style={{ background: "none", WebkitTextFillColor: "var(--warning)" }}>
+              {applications.filter(a => a.status === "pending").length}
+            </div>
+            <div className="stat-label">Pending Review</div>
+          </div>
+        </div>
+      )}
+
+      {/* Companies */}
+      {activeTab === "companies" && (
+        <div className="card">
+          <h3 style={{ marginBottom: "1.25rem" }}>Companies</h3>
+          {companies.length === 0 ? (
+            <p style={{ textAlign: "center", color: "var(--text-dim)", padding: "2rem" }}>No companies yet</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }} className="stagger">
+              {companies.map(c => (
+                <div key={c.id} className="list-row">
+                  <div>
+                    <p style={{ fontWeight: 600, color: "var(--text-h)", margin: 0 }}>{c.name}</p>
+                    <p style={{ fontSize: "0.8rem", color: "var(--text-dim)", margin: "0.2rem 0 0" }}>
+                      {c.email} · {c.location}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button style={{ fontSize: "0.8rem", padding: "0.35rem 0.8rem" }}>Edit</button>
+                    <button className="btn-danger" style={{ fontSize: "0.8rem", padding: "0.35rem 0.8rem" }}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Jobs */}
+      {activeTab === "jobs" && (
+        <div className="card">
+          <h3 style={{ marginBottom: "1.25rem" }}>Jobs</h3>
+          {jobs.length === 0 ? (
+            <p style={{ textAlign: "center", color: "var(--text-dim)", padding: "2rem" }}>No jobs yet</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }} className="stagger">
+              {jobs.map(j => (
+                <div key={j.id} className="list-row">
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 600, color: "var(--text-h)", margin: 0 }}>{j.title}</p>
+                    <p style={{ fontSize: "0.8rem", color: "var(--text-dim)", margin: "0.2rem 0 0" }}>
+                      Company ID: {j.company_id} · ${Number(j.salary).toLocaleString()}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button style={{ fontSize: "0.8rem", padding: "0.35rem 0.8rem" }}>Edit</button>
+                    <button className="btn-danger" style={{ fontSize: "0.8rem", padding: "0.35rem 0.8rem" }}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Applications */}
+      {activeTab === "applications" && (
+        <div className="card">
+          <h3 style={{ marginBottom: "1.25rem" }}>Applications</h3>
+          {applications.length === 0 ? (
+            <p style={{ textAlign: "center", color: "var(--text-dim)", padding: "2rem" }}>No applications yet</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }} className="stagger">
+              {applications.map(app => {
+                const job = jobs.find(j => j.id === app.job_id);
+                return (
+                  <div key={app.id} className="list-row" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <p style={{ fontWeight: 600, color: "var(--text-h)", margin: 0 }}>
+                        {job?.title || "Unknown Position"}
+                      </p>
+                      <p style={{ fontSize: "0.8rem", color: "var(--text-dim)", margin: "0.2rem 0 0" }}>
+                        User #{app.user_id} · {new Date(app.applied_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <span className={statusClass(app.status)}>{app.status}</span>
+                      <select
+                        value={app.status}
+                        onChange={e => handleStatusChange(app.id, e.target.value)}
+                        style={{ width: "auto", marginBottom: 0, fontSize: "0.82rem", padding: "0.35rem 0.5rem" }}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

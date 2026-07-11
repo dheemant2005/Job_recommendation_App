@@ -1,129 +1,159 @@
 import type { Job, JobPayload } from "../types/job";
 import type { Company } from "../types/company";
-
 import { useState } from "react";
 
 type Props = {
-    jobs: Job[];
-    companies: Company[];
-    onEdit: (id: number, job: JobPayload) => void;
-    onDelete: (id: number) => void;
-    onAdd: (job: JobPayload) => void;
-}
+  jobs: Job[];
+  companies: Company[];
+  onEdit: (id: number, job: JobPayload) => void;
+  onDelete: (id: number) => void;
+  onAdd: (job: JobPayload) => void;
+};
 
-function JobCard({
-    jobs, companies, onEdit, onDelete, onAdd
-}: Props) {
-        const [editJobId, setEditJobId] = useState<number | null>(null);
-        const [addform, setAddform] = useState<JobPayload>({
-            title: "",
-            description: "",
-            salary: 0,
-            company_id: 0
-        });
-        const [editform, setEditform] = useState<JobPayload>({
-            title: "",
-            description: "",
-            salary: 0,
-            company_id: 0
-        });
-        const handleAdd = () => {
-            onAdd(addform);
-            setAddform({
-                title: "",
-                description: "",
-                salary: 0,
-                company_id: 0
-            });
-        }
-        const handleSave = () => {
-            if (editJobId !== null) {
-                onEdit(editJobId, editform);
-            }
-            setEditJobId(null);
-            setEditform({
-                title: "",
-                description: "",
-                salary: 0,
-                company_id: 0
-            });
-        }
-        const handlecancel = () => {
-            setEditJobId(null);
-            setEditform({
-                title: "",
-                description: "",
-                salary: 0,
-                company_id: 0
-            })
-        }
+const emptyForm: JobPayload = { title: "", description: "", salary: 0, company_id: 0 };
 
-    return(
-        <div className="page-container" style={{ marginTop: '4rem' }}>
-            <h2>Jobs</h2>
-            <div className="grid-layout">
-                {jobs.map((job) => (
-                    <div key={job.id} className="card">
-                        {editJobId === job.id ? (
-                            <>
-                                <input type="text" value={editform.title} onChange={(e)=>setEditform({...editform,title:e.target.value})} placeholder="Title" />
-                                <input type="text" value={editform.description || ""} onChange={(e)=>setEditform({...editform,description:e.target.value})} placeholder="Description" />
-                                <input type="number" min="0" value={editform.salary} onChange={(e)=>setEditform({...editform,salary:Number(e.target.value)})} placeholder="Salary" />
-                                <select value={editform.company_id || ""} onChange={(e)=>setEditform({...editform,company_id:Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', marginBottom: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg)' }}>
-                                    <option value="" disabled>Select Company</option>
-                                    {companies.map((company) => (
-                                        <option key={company.id} value={company.id}>{company.name}</option>
-                                    ))}
-                                </select>
-                                <div className="action-buttons">
-                                    <button onClick={handleSave}>Save</button>
-                                    <button onClick={handlecancel}>Cancel</button>
-                                </div>
-                            </>
-                        ):
-                        <>
-                            <h3>{job.title}</h3>
-                            <p><strong>Description:</strong> {job.description}</p>
-                            <p><strong>Salary:</strong> {job.salary}</p>
-                            <p><strong>Company:</strong> {companies.find(c => c.id === job.company_id)?.name || job.company_id}</p>
-                            <div className="action-buttons">
-                                <button
-                                    onClick={() => {
-                                        setEditJobId(job.id);
-                                        setEditform({
-                                            title: job.title,
-                                            description: job.description || "",
-                                            salary: job.salary,
-                                            company_id: job.company_id,
-                                        });
-                                    }}
-                                >Edit</button>
-                                <button onClick={() => job.id && onDelete(job.id)}>Delete</button>
-                            </div>
-                        </>}
-                    </div>
-                ))}
-            </div>
+export default function JobCard({ jobs, companies, onEdit, onDelete, onAdd }: Props) {
+  const [editId, setEditId] = useState<number | null>(null);
+  const [addForm, setAddForm] = useState<JobPayload>(emptyForm);
+  const [editForm, setEditForm] = useState<JobPayload>(emptyForm);
+  const [showAdd, setShowAdd] = useState(false);
 
-            <div style={{ marginTop: '3rem' }}>
-                <h2>Add Job</h2>
-                <div className="grid-layout" style={{ maxWidth: '600px', gridTemplateColumns: '1fr' }}>
-                    <div className="card">
-                        <input type="text" value={addform.title} onChange={(e)=>setAddform({...addform,title:e.target.value})} placeholder="Title" />
-                        <input type="text" value={addform.description || ""} onChange={(e)=>setAddform({...addform,description:e.target.value})} placeholder="Description" />
-                        <input type="number" min="0" value={addform.salary} onChange={(e)=>setAddform({...addform,salary:Number(e.target.value)})} placeholder="Salary" />
-                        <select value={addform.company_id || ""} onChange={(e)=>setAddform({...addform,company_id:Number(e.target.value)})} style={{ width: '100%', padding: '0.5rem', marginBottom: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg)' }}>
-                            <option value="" disabled>Select Company</option>
-                            {companies.map((company) => (
-                                        <option key={company.id} value={company.id}>{company.name}</option>
-                            ))}
-                        </select>
-                        <button onClick={handleAdd} style={{ width: '100%' }} disabled={!addform.title.trim() || !addform.description?.trim() || addform.company_id <= 0}>Add Job</button>
-                    </div>
-                </div>
-            </div>
+  const handleSave = () => {
+    if (editId !== null) onEdit(editId, editForm);
+    setEditId(null);
+    setEditForm(emptyForm);
+  };
+
+  return (
+    <div style={{ marginBottom: "3rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Job Listings</h2>
+          <p style={{ margin: "0.25rem 0 0", fontSize: "0.875rem", color: "var(--text-dim)" }}>
+            {jobs.length} open positions
+          </p>
         </div>
-    )
-}
+        <button className="btn-primary" onClick={() => setShowAdd(!showAdd)} style={{ fontSize: "0.875rem" }}>
+          {showAdd ? "✕ Cancel" : "+ Post Job"}
+        </button>
+      </div>
 
-export default JobCard
+      {/* Add Form */}
+      {showAdd && (
+        <div className="card animate-fadein" style={{ marginBottom: "1.5rem", borderColor: "rgba(124,58,237,0.25)" }}>
+          <h3 style={{ marginBottom: "1.25rem" }}>New Job Posting</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1rem" }}>
+            <div style={{ gridColumn: "span 2" }}>
+              <label>Job Title</label>
+              <input type="text" value={addForm.title} onChange={e => setAddForm({ ...addForm, title: e.target.value })} placeholder="Senior Software Engineer" />
+            </div>
+            <div>
+              <label>Company</label>
+              <select value={addForm.company_id || ""} onChange={e => setAddForm({ ...addForm, company_id: Number(e.target.value) })}>
+                <option value="">Select a company…</option>
+                {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label>Salary (USD)</label>
+              <input type="number" min="0" value={addForm.salary} onChange={e => setAddForm({ ...addForm, salary: Number(e.target.value) })} placeholder="90000" />
+            </div>
+            <div style={{ gridColumn: "span 2" }}>
+              <label>Description</label>
+              <textarea value={addForm.description || ""} onChange={e => setAddForm({ ...addForm, description: e.target.value })} placeholder="Describe the role, responsibilities, requirements…" rows={4} style={{ fontFamily: "var(--font)", fontSize: "0.875rem" }} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <button
+              className="btn-primary"
+              onClick={() => { onAdd(addForm); setAddForm(emptyForm); setShowAdd(false); }}
+              disabled={!addForm.title.trim() || addForm.company_id <= 0}
+            >
+              Post Job
+            </button>
+            <button onClick={() => setShowAdd(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Job Grid */}
+      {jobs.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "3rem", color: "var(--text-dim)", border: "1px dashed var(--border)", borderRadius: "var(--radius)" }}>
+          <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>💼</div>
+          <p style={{ margin: 0 }}>No jobs posted yet — post the first one!</p>
+        </div>
+      ) : (
+        <div className="grid-layout stagger">
+          {jobs.map(job => {
+            const company = companies.find(c => c.id === job.company_id);
+            return (
+              <div key={job.id} className="card" style={{ margin: 0, display: "flex", flexDirection: "column" }}>
+                {editId === job.id ? (
+                  <>
+                    <h3 style={{ marginBottom: "1rem" }}>Edit Job</h3>
+                    <label>Title</label>
+                    <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} />
+                    <label>Description</label>
+                    <textarea value={editForm.description || ""} onChange={e => setEditForm({ ...editForm, description: e.target.value })} rows={3} style={{ fontFamily: "var(--font)", fontSize: "0.875rem" }} />
+                    <label>Salary</label>
+                    <input type="number" min="0" value={editForm.salary} onChange={e => setEditForm({ ...editForm, salary: Number(e.target.value) })} />
+                    <label>Company</label>
+                    <select value={editForm.company_id || ""} onChange={e => setEditForm({ ...editForm, company_id: Number(e.target.value) })} style={{ marginBottom: "1rem" }}>
+                      <option value="">Select…</option>
+                      {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <div className="action-buttons">
+                      <button className="btn-primary" onClick={handleSave}>Save</button>
+                      <button onClick={() => { setEditId(null); setEditForm(emptyForm); }}>Cancel</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: "auto" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
+                        <h3 style={{ margin: 0, lineHeight: 1.3, flex: 1 }}>{job.title}</h3>
+                        <span style={{
+                          background: "rgba(16,185,129,0.12)",
+                          color: "var(--success)",
+                          border: "1px solid rgba(16,185,129,0.25)",
+                          padding: "0.2rem 0.55rem",
+                          borderRadius: "100px",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                          marginLeft: "0.5rem",
+                        }}>
+                          ${Number(job.salary).toLocaleString()}
+                        </span>
+                      </div>
+                      {company && (
+                        <p style={{ fontSize: "0.82rem", color: "var(--accent-2)", fontWeight: 500, margin: "0 0 0.75rem" }}>
+                          🏢 {company.name}
+                        </p>
+                      )}
+                      <p style={{ fontSize: "0.875rem", color: "var(--text)", lineHeight: 1.6, margin: 0 }}>
+                        {(job.description || "").slice(0, 120)}{(job.description || "").length > 120 ? "…" : ""}
+                      </p>
+                    </div>
+                    <div className="action-buttons" style={{ marginTop: "1.25rem" }}>
+                      <button
+                        onClick={() => {
+                          setEditId(job.id);
+                          setEditForm({ title: job.title, description: job.description || "", salary: job.salary, company_id: job.company_id });
+                        }}
+                        style={{ flex: 1 }}
+                      >
+                        Edit
+                      </button>
+                      <button className="btn-danger" onClick={() => onDelete(job.id)} style={{ flex: 1 }}>Delete</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

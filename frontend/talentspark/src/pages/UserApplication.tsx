@@ -1,279 +1,161 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { supabase } from '../config/supabase';
+import { useState, useEffect } from "react";
+import api from "../Services/api";
+import { supabase, isSupabaseConfigured } from "../config/supabase";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+interface Job { id: number; title: string; description: string; company_id: number; }
+interface Application { id: number; job_id: number; resume_url: string; status: string; applied_at: string; }
 
-interface Job {
-  id: number;
-  title: string;
-  description: string;
-  company_id: number;
+type Props = { onNavigate?: (page: string) => void };
+
+function statusClass(s: string) {
+  if (s === "pending")  return "badge badge-pending";
+  if (s === "reviewed") return "badge badge-reviewed";
+  if (s === "accepted") return "badge badge-accepted";
+  return "badge badge-rejected";
 }
 
-interface Application {
-  id: number;
-  job_id: number;
-  resume_url: string;
-  status: string;
-  applied_at: string;
-}
-
-export default function UserApplication() {
-  const navigate = useNavigate();
+export default function UserApplication({ onNavigate }: Props) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [selectedJob, setSelectedJob] = useState<number | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-    fetchJobs();
-    fetchApplications();
-  }, [navigate]);
+    Promise.all([
+      api.get("/job/"),
+      api.get("/applications/my").catch(() => ({ data: [] })),
+    ]).then(([j, a]) => { setJobs(j.data); setApplications(a.data); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
-  const fetchJobs = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/jobs/`);
-      setJobs(response.data);
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchApplications = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/applications/my`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setApplications(response.data);
-    } catch (err) {
-      console.error('Failed to fetch applications:', err);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
-  };
+  const fetchApplications = () =>
+    api.get("/applications/my").catch(() => ({ data: [] })).then(r => setApplications(r.data));
 
   const handleUpload = async () => {
-    if (!file || !selectedJob) {
-      setError('Please select a job and upload a resume');
-      return;
-    }
-
-    setUploading(true);
-    setError('');
+    if (!file || !selectedJob) { setError("Please select a job and a resume file."); return; }
+    setUploading(true); setError(""); setSuccess("");
 
     try {
-      // Upload to Supabase Storage
-      const fileName = `${Date.now()}-${file.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resumes')
-        .upload(fileName, file);
+      let resumeUrl = "";
 
-      if (uploadError) {
-        throw new Error(`Supabase upload failed: ${uploadError.message}`);
+      if (isSupabaseConfigured && supabase) {
+        const fileName = `${Date.now()}-${file.name}`;
+        const { error: upErr } = await supabase.storage.from("resumes").upload(fileName, file);
+        if (upErr) throw new Error(upErr.message);
+        const { data: { publicUrl } } = supabase.storage.from("resumes").getPublicUrl(fileName);
+        resumeUrl = publicUrl;
+      } else {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await api.post("/s3/upload", formData, { headers: { "Content-Type": "multipart/form-data" } });
+        resumeUrl = res.data.url || res.data.local_path || "uploaded";
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('resumes')
-        .getPublicUrl(fileName);
-
-      // Submit application to backend
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `${API_URL}/applications/`,
-        {
-          job_id: selectedJob,
-          resume_url: publicUrl
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      // Refresh applications
+      await api.post("/applications/", { job_id: selectedJob, resume_url: resumeUrl });
       await fetchApplications();
-      setFile(null);
-      setSelectedJob(null);
-      alert('Application submitted successfully!');
+      setFile(null); setSelectedJob(null);
+      setSuccess("Application submitted! 🎉 We'll be in touch.");
     } catch (err: any) {
-      setError(err.message || 'Failed to submit application');
+      setError(err.message || "Submission failed. Please try again.");
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDownload = async (url: string, fileName: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('resumes')
-        .download(url.split('/').pop() || fileName);
-
-      if (error) throw error;
-
-      const blob = new Blob([data]);
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-    } catch (err) {
-      console.error('Download failed:', err);
-      alert('Failed to download resume');
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_role');
-    navigate('/');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div style={{ display: "flex", justifyContent: "center", padding: "4rem" }}>
+      <span className="animate-spin" style={{ width: 32, height: 32, border: "3px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", display: "inline-block" }} />
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Job Application Portal</h1>
-            <p className="text-sm text-gray-600">Apply to your dream jobs</p>
-          </div>
+    <div className="page-container" style={{ maxWidth: 900 }}>
+      <div className="page-header">
+        <h2 className="gradient-text">Apply for Jobs</h2>
+        <p>Submit your application and track its status in real time</p>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "1.5rem" }}>
+        {/* Form */}
+        <div className="card" style={{ margin: 0 }}>
+          <h3 style={{ marginBottom: "1.5rem" }}>New Application</h3>
+
+          {error   && <div className="alert alert-error"><span>⚠</span>{error}</div>}
+          {success && <div className="alert alert-success"><span>✓</span>{success}</div>}
+
+          <label>Select Position</label>
+          <select value={selectedJob || ""} onChange={e => setSelectedJob(Number(e.target.value))}>
+            <option value="">Choose a job…</option>
+            {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+          </select>
+
+          <label>Upload Resume</label>
+          <input type="file" accept=".pdf,.doc,.docx" onChange={e => e.target.files?.[0] && setFile(e.target.files[0])} />
+
+          {file && (
+            <div className="alert alert-info" style={{ marginTop: "-0.5rem" }}>
+              <span>📄</span> {file.name} ({(file.size / 1024).toFixed(0)} KB)
+            </div>
+          )}
+
           <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+            onClick={handleUpload}
+            disabled={uploading || !file || !selectedJob}
+            className="btn-primary"
+            style={{ width: "100%", padding: "0.85rem", marginTop: "0.5rem" }}
           >
-            Logout
+            {uploading ? (
+              <>
+                <span className="animate-spin" style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%" }} />
+                Submitting…
+              </>
+            ) : "Submit Application →"}
           </button>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Application Form */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Submit Application</h2>
+        {/* My Applications */}
+        <div className="card" style={{ margin: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+            <h3 style={{ margin: 0 }}>My Applications</h3>
+            <span style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{applications.length} total</span>
+          </div>
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="job" className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Job
-                </label>
-                <select
-                  id="job"
-                  value={selectedJob || ''}
-                  onChange={(e) => setSelectedJob(Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                  required
-                >
-                  <option value="">Choose a job...</option>
-                  {jobs.map((job) => (
-                    <option key={job.id} value={job.id}>
-                      {job.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="resume" className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Resume (PDF)
-                </label>
-                <input
-                  id="resume"
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleFileChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                  required
-                />
-                {file && (
-                  <p className="mt-2 text-sm text-gray-600">Selected: {file.name}</p>
-                )}
-              </div>
-
-              <button
-                onClick={handleUpload}
-                disabled={uploading || !file || !selectedJob}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploading ? 'Uploading...' : 'Submit Application'}
-              </button>
+          {applications.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "2.5rem 1rem", color: "var(--text-dim)" }}>
+              <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>📋</div>
+              <p style={{ margin: 0 }}>No applications yet</p>
             </div>
-          </div>
-
-          {/* My Applications */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">My Applications</h2>
-
-            {applications.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No applications yet</p>
-            ) : (
-              <div className="space-y-4">
-                {applications.map((app) => {
-                  const job = jobs.find(j => j.id === app.job_id);
-                  return (
-                    <div key={app.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {job?.title || 'Unknown Job'}
-                          </h3>
-                          <p className="text-sm text-gray-600">Applied: {new Date(app.applied_at).toLocaleDateString()}</p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          app.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          app.status === 'reviewed' ? 'bg-blue-100 text-blue-800' :
-                          app.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {app.status}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleDownload(app.resume_url, `resume_${app.id}.pdf`)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        Download Resume
-                      </button>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }} className="stagger">
+              {applications.map(app => {
+                const job = jobs.find(j => j.id === app.job_id);
+                return (
+                  <div key={app.id} className="list-row">
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontWeight: 600, color: "var(--text-h)", margin: 0 }}>
+                        {job?.title || "Position"}
+                      </p>
+                      <p style={{ fontSize: "0.78rem", color: "var(--text-dim)", margin: "0.2rem 0 0" }}>
+                        {new Date(app.applied_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    <span className={statusClass(app.status)}>{app.status}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {onNavigate && (
+            <button className="btn-ghost" onClick={() => onNavigate("userdashboard")} style={{ width: "100%", marginTop: "1rem", fontSize: "0.82rem" }}>
+              ← Back to Dashboard
+            </button>
+          )}
         </div>
       </div>
     </div>
