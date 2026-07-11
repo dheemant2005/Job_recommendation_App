@@ -1,0 +1,33 @@
+# FastAPI & Server
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+
+# Database
+sqlalchemy
+psycopg2-binary
+asyncpg
+alembic
+
+# Auth
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.1.3
+
+# AI / LLM
+langchain
+langchain-core
+langchain-groq
+langchain-google-genai
+langchain-community
+
+# Vector DB & Embeddings
+qdrant-client
+fastembed
+
+# Data / Utils
+pydantic
+python-docx
+boto3
+supabase

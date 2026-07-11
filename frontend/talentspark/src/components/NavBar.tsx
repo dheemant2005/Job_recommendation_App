@@ -1,0 +1,34 @@
+type Props = {
+    currentPage: string;
+    onNavigate: (page: string) => void;
+}
+
+function NavBar({ currentPage, onNavigate }: Props) {
+    const userRole = localStorage.getItem('user_role');
+    
+    return (
+        <nav>
+            <button onClick={() => onNavigate("home")} disabled={currentPage === "home"}>Home</button>
+            <button onClick={() => onNavigate("chat")} disabled={currentPage === "chat"}>Chat</button>
+            <button onClick={() => onNavigate("resume")} disabled={currentPage === "resume"}>Resume</button>
+            <button onClick={() => onNavigate("jobmatch")} disabled={currentPage === "jobmatch"}>Job Match</button>
+            {userRole === 'Admin' && (
+                <button onClick={() => onNavigate("admindashboard")} disabled={currentPage === "admindashboard"}>Admin Dashboard</button>
+            )}
+            {userRole === 'User' && (
+                <button onClick={() => onNavigate("userdashboard")} disabled={currentPage === "userdashboard"}>My Dashboard</button>
+            )}
+            <button
+                onClick={() => {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user_role");
+                    window.location.reload();
+                }}
+            >
+                Logout
+            </button>
+        </nav>
+    )
+}
+
+export default NavBar
