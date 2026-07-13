@@ -57,7 +57,7 @@ export default function Register({ onSwitchToLogin }: Props) {
           <select value={role} onChange={(e) => setRole(e.target.value)} style={{ marginBottom: "1.5rem" }}>
             <option value="user">Job Seeker</option>
             <option value="hr">HR / Recruiter</option>
-            <option value="Admin">Admin</option>
+            <option value="admin">Admin</option>
           </select>
 
           <button

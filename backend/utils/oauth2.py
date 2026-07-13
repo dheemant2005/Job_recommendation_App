@@ -16,8 +16,10 @@ async def get_current_user(token: str=Depends(oauth2_scheme),db:AsyncSession=Dep
         raise HTTPException(status_code=401,detail="Invalid credentials")
     return current_user
 def role_required(roles:list):
+    allowed_roles = [r.lower() for r in roles]
     def role_decorator(current_user=Depends(get_current_user)):
-        if current_user.role not in roles:
+        user_role = current_user.role.lower() if current_user.role else ""
+        if user_role not in allowed_roles:
             raise HTTPException(status_code=403,detail="Access denied")
         return current_user
     return role_decorator
