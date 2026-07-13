@@ -21,34 +21,6 @@ function ScoreBadge({ value }: { value: number }) {
     </span>
   );
 }
-
-function JobResultCard({ title, description, salary, onApply }: {
-  title: string; description: string; salary?: number | null; onApply: () => void;
-}) {
-  return (
-    <div className="list-row" style={{ flexDirection: "column", alignItems: "flex-start" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "flex-start", gap: "1rem" }}>
-        <div style={{ flex: 1 }}>
-          <h4 style={{ margin: "0 0 0.25rem", color: "var(--text-h)" }}>{title}</h4>
-          <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--text)", lineHeight: 1.5 }}>
-            {description?.slice(0, 140)}{description?.length > 140 ? "…" : ""}
-          </p>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem", flexShrink: 0 }}>
-          {salary != null && (
-            <span style={{ fontSize: "0.82rem", color: "var(--success)", fontWeight: 600 }}>
-              💰 ${Number(salary).toLocaleString()}
-            </span>
-          )}
-          <button className="btn-primary" onClick={onApply} style={{ fontSize: "0.8rem", padding: "0.4rem 0.9rem" }}>
-            Apply →
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function JobMatch({ onNavigate }: Props) {
   const [skills, setSkills] = useState("");
   const [experience, setExperience] = useState("");
