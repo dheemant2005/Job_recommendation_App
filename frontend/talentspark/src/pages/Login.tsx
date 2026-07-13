@@ -19,9 +19,15 @@ export default function Login({ onLogin, onSwitchToRegister }: Props) {
     try {
       const response = await login({ email, password });
       try {
-        const payload = JSON.parse(atob(response.access_token.split(".")[1]));
+        const base64Url = response.access_token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const pad = base64.length % 4;
+        const paddedBase64 = pad ? base64 + "=".repeat(4 - pad) : base64;
+        const payload = JSON.parse(atob(paddedBase64));
         if (payload.role) localStorage.setItem("user_role", payload.role);
-      } catch {}
+      } catch (e) {
+        console.error("Error parsing user role:", e);
+      }
       onLogin(response.access_token);
     } catch (err: any) {
       const detail = err?.response?.data?.detail;

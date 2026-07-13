@@ -22,7 +22,11 @@ export default function AdminLogin({ onNavigate, onLogin }: Props) {
       const { access_token } = response;
 
       // Decode JWT to check role
-      const payload = JSON.parse(atob(access_token.split('.')[1]));
+      const base64Url = access_token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = base64.length % 4;
+      const paddedBase64 = pad ? base64 + '='.repeat(4 - pad) : base64;
+      const payload = JSON.parse(atob(paddedBase64));
 
       if (payload.role !== 'Admin') {
         setError('Access denied. Admin privileges required.');
