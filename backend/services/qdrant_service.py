@@ -12,10 +12,29 @@ load_dotenv()
 COLLECTION_NAME = "job_descriptions"
 VECTOR_SIZE = 384  # BAAI/bge-small-en-v1.5 outputs 384-dim vectors
 
-qdrant = QdrantClient(
-    url=os.getenv("QDRANT_URL"),
-    api_key=os.getenv("QDRANT_API_KEY"),
-)
+import logging
+import socket
+
+logger = logging.getLogger(__name__)
+
+qdrant_url = os.getenv("QDRANT_URL")
+qdrant_api_key = os.getenv("QDRANT_API_KEY")
+
+if qdrant_url and ("localhost" in qdrant_url or "127.0.0.1" in qdrant_url):
+    try:
+        # Check if local Qdrant server is running on port 6333
+        with socket.create_connection(("localhost", 6333), timeout=1.0):
+            qdrant = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+            logger.info("Connected to local Qdrant server on port 6333.")
+    except (socket.timeout, ConnectionRefusedError):
+        logger.warning("Local Qdrant server not found on port 6333. Falling back to local file-based Qdrant storage at './local_qdrant_db'")
+        qdrant = QdrantClient(path="./local_qdrant_db")
+else:
+    qdrant = QdrantClient(
+        url=qdrant_url,
+        api_key=qdrant_api_key,
+    )
+
 
 # Free embedding model — no API key needed, lightweight (no PyTorch)
 embeddings_model = TextEmbedding("BAAI/bge-small-en-v1.5")

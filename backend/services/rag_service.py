@@ -36,5 +36,17 @@ def rag_job_search(question: str) -> str:
         for r in results
     ])
 
-    response = rag_chain.invoke({"context": context, "question": question})
-    return response.content
+    try:
+        response = rag_chain.invoke({"context": context, "question": question})
+        return response.content
+    except Exception as e:
+        api_key = os.getenv("GROQ_API_KEY", "")
+        if "dummy" in api_key or "invalid" in str(e).lower() or "401" in str(e):
+            return (
+                f"🤖 [DEMO MODE - Mock RAG Response]\n\n"
+                f"To get real AI answers based on database jobs, please set a valid `GROQ_API_KEY` in `backend/.env`.\n\n"
+                f"Here are the top matching jobs retrieved from the database for your query \"{question}\":\n\n"
+                f"{context}"
+            )
+        raise e
+
