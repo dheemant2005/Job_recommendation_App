@@ -184,9 +184,27 @@ function App() {
             fontSize: "0.88rem",
             textAlign: "center",
             marginBottom: "1rem",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "1rem",
           }}
         >
-          ⚠️ {error}
+          <span>⚠️ {error}</span>
+          <button
+            onClick={fetchData}
+            style={{
+              background: "var(--danger)",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              padding: "0.25rem 0.6rem",
+              cursor: "pointer",
+              fontSize: "0.78rem",
+            }}
+          >
+            Retry
+          </button>
         </div>
       )}
 
