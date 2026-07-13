@@ -3,3 +3,5 @@ env
 node_modules
 .env
 .venv
+backend/local_qdrant_db/
+frontend/talentspark/dist/
