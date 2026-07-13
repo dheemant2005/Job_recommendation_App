@@ -1,0 +1,9 @@
+{
+  "name": "talentspark-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "preinstall": "npm install --prefix frontend/talentspark",
+    "build": "npm run build --prefix frontend/talentspark && mkdir -p dist && cp -r frontend/talentspark/dist/. ./dist"
+  }
+}
