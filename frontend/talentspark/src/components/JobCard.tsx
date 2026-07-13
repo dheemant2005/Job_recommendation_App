@@ -18,6 +18,9 @@ export default function JobCard({ jobs, companies, onEdit, onDelete, onAdd }: Pr
   const [editForm, setEditForm] = useState<JobPayload>(emptyForm);
   const [showAdd, setShowAdd] = useState(false);
 
+  const userRole = localStorage.getItem("user_role")?.toLowerCase();
+  const isAuthorized = userRole === "admin" || userRole === "hr";
+
   const handleSave = () => {
     if (editId !== null) onEdit(editId, editForm);
     setEditId(null);
@@ -33,9 +36,11 @@ export default function JobCard({ jobs, companies, onEdit, onDelete, onAdd }: Pr
             {jobs.length} open positions
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAdd(!showAdd)} style={{ fontSize: "0.875rem" }}>
-          {showAdd ? "✕ Cancel" : "+ Post Job"}
-        </button>
+        {isAuthorized && (
+          <button className="btn-primary" onClick={() => setShowAdd(!showAdd)} style={{ fontSize: "0.875rem" }}>
+            {showAdd ? "✕ Cancel" : "+ Post Job"}
+          </button>
+        )}
       </div>
 
       {/* Add Form */}
@@ -135,18 +140,20 @@ export default function JobCard({ jobs, companies, onEdit, onDelete, onAdd }: Pr
                         {(job.description || "").slice(0, 120)}{(job.description || "").length > 120 ? "…" : ""}
                       </p>
                     </div>
-                    <div className="action-buttons" style={{ marginTop: "1.25rem" }}>
-                      <button
-                        onClick={() => {
-                          setEditId(job.id);
-                          setEditForm({ title: job.title, description: job.description || "", salary: job.salary, company_id: job.company_id });
-                        }}
-                        style={{ flex: 1 }}
-                      >
-                        Edit
-                      </button>
-                      <button className="btn-danger" onClick={() => onDelete(job.id)} style={{ flex: 1 }}>Delete</button>
-                    </div>
+                    {isAuthorized && (
+                      <div className="action-buttons" style={{ marginTop: "1.25rem" }}>
+                        <button
+                          onClick={() => {
+                            setEditId(job.id);
+                            setEditForm({ title: job.title, description: job.description || "", salary: job.salary, company_id: job.company_id });
+                          }}
+                          style={{ flex: 1 }}
+                        >
+                          Edit
+                        </button>
+                        <button className="btn-danger" onClick={() => onDelete(job.id)} style={{ flex: 1 }}>Delete</button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

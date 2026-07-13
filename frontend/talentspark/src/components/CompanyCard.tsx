@@ -18,6 +18,9 @@ export default function CompanyCard({ companies, jobs, onAdd, onEdit, onDelete }
   const [editForm, setEditForm] = useState<CompanyPayload>(emptyForm);
   const [showAdd, setShowAdd] = useState(false);
 
+  const userRole = localStorage.getItem("user_role")?.toLowerCase();
+  const isAdmin = userRole === "admin";
+
   const handleSave = () => {
     if (editId !== null) onEdit(editId, editForm);
     setEditId(null);
@@ -33,9 +36,11 @@ export default function CompanyCard({ companies, jobs, onAdd, onEdit, onDelete }
             {companies.length} registered
           </p>
         </div>
-        <button className="btn-primary" onClick={() => setShowAdd(!showAdd)} style={{ fontSize: "0.875rem" }}>
-          {showAdd ? "✕ Cancel" : "+ Add Company"}
-        </button>
+        {isAdmin && (
+          <button className="btn-primary" onClick={() => setShowAdd(!showAdd)} style={{ fontSize: "0.875rem" }}>
+            {showAdd ? "✕ Cancel" : "+ Add Company"}
+          </button>
+        )}
       </div>
 
       {/* Add Form */}
@@ -128,17 +133,19 @@ export default function CompanyCard({ companies, jobs, onAdd, onEdit, onDelete }
                       <span style={{ color: "var(--text)" }}>{company.location}</span>
                     </div>
                   </div>
-                  <div className="action-buttons" style={{ marginTop: "auto" }}>
-                    <button
-                      onClick={() => { setEditId(company.id); setEditForm({ name: company.name, email: company.email, phone: company.phone, location: company.location }); }}
-                      style={{ flex: 1 }}
-                    >
-                      Edit
-                    </button>
-                    <button className="btn-danger" onClick={() => onDelete(company.id)} style={{ flex: 1 }}>
-                      Delete
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="action-buttons" style={{ marginTop: "auto" }}>
+                      <button
+                        onClick={() => { setEditId(company.id); setEditForm({ name: company.name, email: company.email, phone: company.phone, location: company.location }); }}
+                        style={{ flex: 1 }}
+                      >
+                        Edit
+                      </button>
+                      <button className="btn-danger" onClick={() => onDelete(company.id)} style={{ flex: 1 }}>
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>

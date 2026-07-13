@@ -36,7 +36,7 @@ export default function NavBar({ currentPage, onNavigate, onLogout }: Props) {
         </button>
       ))}
 
-      {(userRole === "Admin") && (
+      {(userRole?.toLowerCase() === "admin") && (
         <button
           onClick={() => onNavigate("admindashboard")}
           disabled={currentPage === "admindashboard"}
@@ -45,7 +45,7 @@ export default function NavBar({ currentPage, onNavigate, onLogout }: Props) {
         </button>
       )}
 
-      {(userRole === "user" || userRole === "User") && (
+      {(userRole?.toLowerCase() === "user") && (
         <button
           onClick={() => onNavigate("userdashboard")}
           disabled={currentPage === "userdashboard"}
